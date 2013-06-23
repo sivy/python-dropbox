@@ -3,13 +3,13 @@ import subprocess
 import shutil
 import sys
 
-from setuptools import setup, find_packages
+from setuptools import setup
 
 parent_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 INSTALL_REQUIRES = []
 if sys.version_info < (2, 6):
-    INSTALL_REQUIRES.append('simplejson') # The 'json' module is included with Python 2.6+
+    INSTALL_REQUIRES.append('simplejson')  # The 'json' module is included with Python 2.6+
     INSTALL_REQUIRES.append('ssl')  # This module is built in to Python 2.6+
 
 extra = {}
@@ -32,14 +32,14 @@ else:
 #must be called dropbox-client so it overwrites the older dropbox SDK
 setup(name='dropbox-python-sdk',
       version='1.5.1',
-      description='Official Dropbox REST API Client',
-      author='Dropbox, Inc.',
+      description='Fork of Official Dropbox REST API Client',
+      author='Steve Ivy; Dropbox, Inc.',
       author_email='support-api@dropbox.com',
       url='http://www.dropbox.com/',
       packages=['dropbox', 'tests'],
       install_requires=INSTALL_REQUIRES,
       package_data={'dropbox': ['trusted-certs.crt'],
-                    'tests' : ['server.crt', 'server.key']},
+                    'tests': ['server.crt', 'server.key']},
       test_suite=TEST_SUITE,
       tests_require=['mock'],
       **extra
