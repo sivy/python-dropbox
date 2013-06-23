@@ -1,3 +1,7 @@
+This is my fork of the Dropbox API and includes [some additions](https://github.com/sivy/python-dropbox/blob/master/dropbox/session.py#L26) to OAuthToken to make it easier to store and recover from sessions, cookies, etc.
+
+******
+
 Dropbox Python SDK
 ==================
 
