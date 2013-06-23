@@ -22,7 +22,6 @@ except ImportError:
 
 from . import rest
 
-
 class OAuthToken(object):
     __slots__ = ('key', 'secret')
 
@@ -37,6 +36,7 @@ class OAuthToken(object):
     def from_string(s):
         args = s.split('|')
         return OAuthToken(*args)
+
 
 class DropboxSession(object):
     API_VERSION = 1
@@ -179,12 +179,12 @@ class DropboxSession(object):
             - An dropbox.session.OAuthToken representing the request token Dropbox assigned
               to this app. Also attaches the request token as self.request_token.
         """
-        self.token = None  # clear any token currently on the request
+        self.token = None # clear any token currently on the request
         url = self.build_url(self.API_HOST, '/oauth/request_token')
         headers, params = self.build_access_headers('POST', url)
 
         response = self.rest_client.POST(url, headers=headers, params=params, raw_response=True)
-        self.request_token = self._parse_token(response.content)
+        self.request_token = self._parse_token(response.read())
         return self.request_token
 
     def obtain_access_token(self, request_token=None):
@@ -213,7 +213,7 @@ class DropboxSession(object):
         headers, params = self.build_access_headers('POST', url, request_token=request_token)
 
         response = self.rest_client.POST(url, headers=headers, params=params, raw_response=True)
-        self.token = self._parse_token(response.content)
+        self.token = self._parse_token(response.read())
         return self.token
 
     def build_access_headers(self, method, resource_url, params=None, request_token=None):
@@ -237,10 +237,10 @@ class DropboxSession(object):
             params = params.copy()
 
         oauth_params = {
-            'oauth_consumer_key': self.consumer_creds.key,
-            'oauth_timestamp': self._generate_oauth_timestamp(),
-            'oauth_nonce': self._generate_oauth_nonce(),
-            'oauth_version': self._oauth_version(),
+            'oauth_consumer_key' : self.consumer_creds.key,
+            'oauth_timestamp' : self._generate_oauth_timestamp(),
+            'oauth_nonce' : self._generate_oauth_nonce(),
+            'oauth_version' : self._oauth_version(),
         }
 
         token = request_token if request_token is not None else self.token
@@ -256,8 +256,8 @@ class DropboxSession(object):
 
     @classmethod
     def _oauth_sign_request(cls, params, consumer_pair, token_pair):
-        params.update({'oauth_signature_method': 'PLAINTEXT',
-                       'oauth_signature': ('%s&%s' % (consumer_pair.secret, token_pair.secret)
+        params.update({'oauth_signature_method' : 'PLAINTEXT',
+                       'oauth_signature' : ('%s&%s' % (consumer_pair.secret, token_pair.secret)
                                             if token_pair is not None else
                                             '%s&' % (consumer_pair.secret,))})
 

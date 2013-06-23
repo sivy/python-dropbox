@@ -3,11 +3,11 @@ The main client API you'll be working with most often.  You'll need to
 configure a dropbox.session.DropboxSession for this to work, but otherwise
 it's fairly self-explanatory.
 
-Before you can begin making requests to the dropbox API, you have to
-authenticate your application with Dropbox and get the user to
+Before you can begin making requests to the dropbox API, you have to 
+authenticate your application with Dropbox and get the user to 
 authorize your application to use dropbox on his behalf. A typical
 progam, from the initial imports to making a simple request (``account_info``),
-looks like this:
+looks like this:   
 
 .. code-block:: python
 
@@ -276,7 +276,7 @@ class DropboxClient(object):
 
     def put_file(self, full_path, file_obj, overwrite=False, parent_rev=None):
         """Upload a file.
-
+        
         A typical use case would be as follows:
 
         .. code-block:: python
@@ -422,8 +422,7 @@ class DropboxClient(object):
         dropbox.rest.ErrorResponse if parsing fails.
         """
         metadata = None
-
-        for header, header_val in dropbox_raw_response.headers.iteritems():
+        for header, header_val in dropbox_raw_response.getheaders():
             if header.lower() == 'x-dropbox-metadata':
                 try:
                     metadata = json.loads(header_val)
@@ -653,7 +652,7 @@ class DropboxClient(object):
 
             folder_metadata = client.metadata('/')
             print "metadata:", folder_metadata
-
+        
         which would return the metadata of the root directory. This
         will look something like:
 
@@ -673,7 +672,7 @@ class DropboxClient(object):
                        'root': 'dropbox',
                        'size': '0 bytes',
                        'thumb_exists': False
-                    },
+                    }, 
                     {
                        'bytes': 77,
                        'icon': 'page_white_text',
@@ -699,7 +698,7 @@ class DropboxClient(object):
 
         In this example, the root directory contains two things: ``Sample Folder``,
         which is a folder, and ``/magnum-opus.txt``, which is a text file 77 bytes long
-
+ 
         Args:
             - ``path``: The path to the file or folder.
             - ``list``: Whether to list all contained files (only applies when

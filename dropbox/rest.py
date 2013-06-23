@@ -5,15 +5,14 @@ dropbox.client and dropbox.session modules. You shouldn't need to use this.
 
 import httplib
 import os
-# import pkg_resources
+import pkg_resources
 import re
 import socket
-# import ssl
+import ssl
 import sys
 import urllib
 import urlparse
 from . import util
-from google.appengine.api import urlfetch
 
 try:
     import json
@@ -22,35 +21,32 @@ except ImportError:
 
 SDK_VERSION = "1.5.1"
 
-# TRUSTED_CERT_FILE = pkg_resources.resource_filename(__name__, 'trusted-certs.crt')
+TRUSTED_CERT_FILE = pkg_resources.resource_filename(__name__, 'trusted-certs.crt')
 
+class ProperHTTPSConnection(httplib.HTTPConnection):
+    """
+    httplib.HTTPSConnection is broken because it doesn't do server certificate
+    validation.  This class does certificate validation by ensuring:
+       1. The certificate sent down by the server has a signature chain to one of
+          the certs in our 'trusted-certs.crt' (this is mostly handled by the 'ssl'
+          module).
+       2. The hostname in the certificate matches the hostname we're connecting to.
+    """
 
-# class ProperHTTPSConnection(httplib.HTTPConnection):
-#     """
-#     httplib.HTTPSConnection is broken because it doesn't do server certificate
-#     validation.  This class does certificate validation by ensuring:
-#        1. The certificate sent down by the server has a signature chain to one of
-#           the certs in our 'trusted-certs.crt' (this is mostly handled by the 'ssl'
-#           module).
-#        2. The hostname in the certificate matches the hostname we're connecting to.
-#     """
+    def __init__(self, host, port, trusted_cert_file=TRUSTED_CERT_FILE):
+        httplib.HTTPConnection.__init__(self, host, port)
+        self.ca_certs = trusted_cert_file
+        self.cert_reqs = ssl.CERT_REQUIRED
 
-#     def __init__(self, host, port, trusted_cert_file=TRUSTED_CERT_FILE):
-#         httplib.HTTPConnection.__init__(self, host, port)
-#         self.ca_certs = trusted_cert_file
-#         self.cert_reqs = ssl.CERT_REQUIRED
-
-#     def connect(self):
-#         sock = create_connection((self.host, self.port))
-#         self.sock = ssl.wrap_socket(sock, cert_reqs=self.cert_reqs, ca_certs=self.ca_certs)
-#         cert = self.sock.getpeercert()
-#         hostname = self.host.split(':', 0)[0]
-#         match_hostname(cert, hostname)
-
+    def connect(self):
+        sock = create_connection((self.host, self.port))
+        self.sock = ssl.wrap_socket(sock, cert_reqs=self.cert_reqs, ca_certs=self.ca_certs)
+        cert = self.sock.getpeercert()
+        hostname = self.host.split(':', 0)[0]
+        match_hostname(cert, hostname)
 
 class CertificateError(ValueError):
     pass
-
 
 def _dnsname_to_pat(dn):
     pats = []
@@ -64,7 +60,6 @@ def _dnsname_to_pat(dn):
             frag = re.escape(frag)
             pats.append(frag.replace(r'\*', '[^.]*'))
     return re.compile(r'\A' + r'\.'.join(pats) + r'\Z', re.IGNORECASE)
-
 
 # This was ripped from Python 3.2 so it's not tested
 def match_hostname(cert, hostname):
@@ -101,7 +96,6 @@ def match_hostname(cert, hostname):
     else:
         raise CertificateError("no appropriate commonName or subjectAltName fields were found")
 
-
 def create_connection(address):
     host, port = address
     err = None
@@ -123,12 +117,10 @@ def create_connection(address):
     else:
         raise socket.error("getaddrinfo returns an empty list")
 
-
 def json_loadb(data):
     if sys.version_info >= (3,):
         data = data.decode('utf8')
     return json.loads(data)
-
 
 class RESTClientObject(object):
     def __init__(self, http_connect=None):
@@ -145,63 +137,60 @@ class RESTClientObject(object):
             body = urllib.urlencode(post_params)
             headers["Content-type"] = "application/x-www-form-urlencoded"
 
-        # # maintain dynamic lookup of ProperHTTPConnection
-        # http_connect = self.http_connect
-        # if http_connect is None:
-        #     http_connect = ProperHTTPSConnection
+        # maintain dynamic lookup of ProperHTTPConnection
+        http_connect = self.http_connect
+        if http_connect is None:
+            http_connect = ProperHTTPSConnection
 
-        # host = urlparse.urlparse(url).hostname
-        # conn = http_connect(host, 443)
+        host = urlparse.urlparse(url).hostname
+        conn = http_connect(host, 443)
 
-        # try:
-        #     # This code is here because httplib in pre-2.6 Pythons
-        #     # doesn't handle file-like objects as HTTP bodies and
-        #     # thus requires manual buffering
-        #     if not hasattr(body, 'read'):
-        #         conn.request(method, url, body, headers)
-        #     else:
-        #         # Content-Length should be set to prevent upload truncation errors.
-        #         clen, raw_data = util.analyze_file_obj(body)
-        #         headers["Content-Length"] = str(clen)
-        #         conn.request(method, url, "", headers)
-        #         if raw_data is not None:
-        #             conn.send(raw_data)
-        #         else:
-        #             BLOCKSIZE = 4 * 1024 * 1024  # 4MB buffering just because
-        #             bytes_read = 0
-        #             while True:
-        #                 data = body.read(BLOCKSIZE)
-        #                 if not data:
-        #                     break
-        #                 # Catch Content-Length overflow before the HTTP server does
-        #                 bytes_read += len(data)
-        #                 if bytes_read > clen:
-        #                     raise util.AnalyzeFileObjBug(clen, bytes_read)
-        #                 conn.send(data)
-        #             if bytes_read != clen:
-        #                 raise util.AnalyzeFileObjBug(clen, bytes_read)
+        try:
+            # This code is here because httplib in pre-2.6 Pythons
+            # doesn't handle file-like objects as HTTP bodies and
+            # thus requires manual buffering
+            if not hasattr(body, 'read'):
+                conn.request(method, url, body, headers)
+            else:
+                # Content-Length should be set to prevent upload truncation errors.
+                clen, raw_data = util.analyze_file_obj(body)
+                headers["Content-Length"] = str(clen)
+                conn.request(method, url, "", headers)
+                if raw_data is not None:
+                    conn.send(raw_data)
+                else:
+                    BLOCKSIZE = 4 * 1024 * 1024 # 4MB buffering just because
+                    bytes_read = 0
+                    while True:
+                        data = body.read(BLOCKSIZE)
+                        if not data:
+                            break
+                        # Catch Content-Length overflow before the HTTP server does
+                        bytes_read += len(data)
+                        if bytes_read > clen:
+                            raise util.AnalyzeFileObjBug(clen, bytes_read)
+                        conn.send(data)
+                    if bytes_read != clen:
+                        raise util.AnalyzeFileObjBug(clen, bytes_read)
 
-        # except socket.error, e:
-        #     raise RESTSocketError(host, e)
-        # except CertificateError, e:
-        #     raise RESTSocketError(host, "SSL certificate error: " + e)
+        except socket.error, e:
+            raise RESTSocketError(host, e)
+        except CertificateError, e:
+            raise RESTSocketError(host, "SSL certificate error: " + e)
 
-        # r = conn.getresponse()
-        r = urlfetch.fetch(url, method=method, headers=headers,
-                                payload=body)
-
-        if r.status_code != 200:
+        r = conn.getresponse()
+        if r.status != 200:
             raise ErrorResponse(r)
 
         if raw_response:
             return r
         else:
             try:
-                resp = json_loadb(r.content)
+                resp = json_loadb(r.read())
             except ValueError:
                 raise ErrorResponse(r)
-            # finally:
-            #     conn.close()
+            finally:
+                conn.close()
 
         return resp
 
@@ -220,7 +209,6 @@ class RESTClientObject(object):
     def PUT(self, url, body, headers=None, raw_response=False):
         assert type(raw_response) == bool
         return self.request("PUT", url, body=body, headers=headers, raw_response=raw_response)
-
 
 class RESTClient(object):
     IMPL = RESTClientObject()
@@ -276,7 +264,6 @@ class RESTClient(object):
         """Perform a PUT request using RESTClient.request"""
         return cls.IMPL.PUT(*n, **kw)
 
-
 class RESTSocketError(socket.error):
     """
     A light wrapper for socket.errors raised by dropbox.rest.RESTClient.request
@@ -286,7 +273,6 @@ class RESTSocketError(socket.error):
     def __init__(self, host, e):
         msg = "Error connecting to \"%s\": %s" % (host, str(e))
         socket.error.__init__(self, msg)
-
 
 class ErrorResponse(Exception):
     """
@@ -302,10 +288,10 @@ class ErrorResponse(Exception):
     """
 
     def __init__(self, http_resp):
-        self.status = http_resp.status_code
-        # self.reason = http_resp.reason
-        self.body = http_resp.content
-        self.headers = http_resp.headers
+        self.status = http_resp.status
+        self.reason = http_resp.reason
+        self.body = http_resp.read()
+        self.headers = http_resp.getheaders()
 
         try:
             self.body = json_loadb(self.body)
